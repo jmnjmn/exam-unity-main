@@ -55,15 +55,18 @@ public class Q1 : MonoBehaviour
     public void OnGenerateBtnClick()
     {
         // TODO: 请在此处开始作答
-        _gridItemPool = new ObjectPool<GameObject>(
-            () => Instantiate(gridItemPrefab), 
-            (obj)=> obj.SetActive(true),
-            (obj)=> obj.SetActive(false),
-            null,
-            true,
-            100);
+        if (_gridItemPool ==null)
+        {
+            _gridItemPool = new ObjectPool<GameObject>(
+                () => Instantiate(gridItemPrefab), 
+                (obj)=> obj.SetActive(true),
+                (obj)=> obj.SetActive(false),
+                null,
+                true,
+                100);
+        }
         
-        StopAllCoroutines();
+        StopCoroutine(GenerateGrid());
         StartCoroutine(GenerateGrid());
     }
 
