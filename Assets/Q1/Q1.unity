@@ -847,6 +847,9 @@ MonoBehaviour:
   zInputField: {fileID: 72764580}
   gridRootNode: {fileID: 2014965483}
   gridItemPrefab: {fileID: 2621775882483554834, guid: 2cb7d491107ff4e29a33a8847ca6305d, type: 3}
+  rowCount: 10
+  columnCount: 10
+  yieldTime: 0
 --- !u!1 &1184055011
 GameObject:
   m_ObjectHideFlags: 0

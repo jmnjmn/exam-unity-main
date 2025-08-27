@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Pool;
 using UnityEngine.UI;
 
 /**
@@ -45,8 +46,183 @@ public class Q1 : MonoBehaviour
     [SerializeField]
     private GameObject gridItemPrefab = null;
 
+
+    [SerializeField] private int rowCount = 10;
+    [SerializeField] private int columnCount = 10;
+    [SerializeField] [Range(0, 1f)] private float yieldTime = 0.2f;
+
+    private ObjectPool<GameObject> _gridItemPool;
     public void OnGenerateBtnClick()
     {
         // TODO: 请在此处开始作答
+        _gridItemPool = new ObjectPool<GameObject>(
+            () => Instantiate(gridItemPrefab), 
+            (obj)=> obj.SetActive(true),
+            (obj)=> obj.SetActive(false),
+            null,
+            true,
+            100);
+        
+        StopAllCoroutines();
+        StartCoroutine(GenerateGrid());
+    }
+
+    private IEnumerator GenerateGrid()
+    {
+        WaitForSeconds wait = new WaitForSeconds(this.yieldTime);
+        // 如果存在格子，先入池
+        foreach (Transform child in gridRootNode)
+        {
+            _gridItemPool.Release(child.gameObject);
+        }
+
+        float baseProbability = 1f / COLORS.Length;
+        // 读取输入框的值,进行归一化到0-1内。假设输入的数值是百分比值
+        float.TryParse(xInputField.text, out var probX);
+        probX = Mathf.Clamp01(probX * 0.01f);
+        float.TryParse(yInputField.text, out var probY);
+        probY = Mathf.Clamp01(probY * 0.01f);
+        float.TryParse(zInputField.text, out var probZ);
+        probZ = Mathf.Clamp01(probZ * 0.01f);
+
+        // 初始化存储格子的颜色索引
+        int[][] matrixColorIndex = new int[rowCount][];
+
+        float[] colorProbabilities = new float[COLORS.Length];
+
+        for (int y = 0; y < rowCount; y++)
+        {
+            matrixColorIndex[y] = new int[columnCount];
+            for (int x = 0; x < columnCount; x++)
+            {
+                CalculateProbabilities(x, y, matrixColorIndex, baseProbability,
+                    probX, probY, probZ, colorProbabilities);
+
+
+                // 随机选择颜色
+                int colorIndex = 0;
+                float r = Random.Range(0, 1f);
+                float sumProbability = 0f;
+                for (int i = 0; i < colorProbabilities.Length; i++)
+                {
+                    sumProbability += colorProbabilities[i];
+                    if (r <= sumProbability)
+                    {
+                        colorIndex = i;
+                        break;
+                    }
+                }
+
+                matrixColorIndex[y][x] = colorIndex;
+
+                // 实例化格子
+                GameObject gridItem = _gridItemPool.Get();
+                gridItem.transform.SetParent(gridRootNode, false);
+                gridItem.transform.localPosition =
+                    new Vector3((x - columnCount / 2f + 0.5f) * GRID_ITEM_SIZE,
+                        (rowCount / 2f - y - 0.5f) * GRID_ITEM_SIZE,
+                        0f);
+                gridItem.GetComponent<Image>().color = COLORS[colorIndex];
+                if (yieldTime > 0)
+                {
+                    yield return wait;
+                }
+               
+            }
+        }
+    }
+
+    /// <summary>
+    /// 计算格子(x,y)的颜色概率
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="matrixColor"></param>
+    /// <param name="baseProb"></param>
+    /// <param name="probX"></param>
+    /// <param name="probY"></param>
+    /// <param name="probZ"></param>
+    /// <param name="colorProbabilities"></param>
+    private void CalculateProbabilities(int x, int y, int[][] matrixColor,
+        float baseProb, float probX, float probY, float probZ,
+        float[] colorProbabilities)
+    {
+        if (colorProbabilities == null)
+        {
+            colorProbabilities = new float[COLORS.Length];
+        }
+        else
+        {
+            // 重置颜色概率
+            for (int i = 0; i < colorProbabilities.Length; i++)
+            {
+                colorProbabilities[i] = 0;
+            }
+        }
+
+        if (y == 0 && x == 0)
+        {
+            for (int i = 0; i < colorProbabilities.Length; i++)
+            {
+                colorProbabilities[i] = baseProb;
+            }
+        }
+        else
+        {
+            int leftColor = x - 1 >= 0 ? matrixColor[y][x - 1] : -1;
+            int topColor = y - 1 >= 0 ? matrixColor[y - 1][x] : -1;
+
+            // c情况
+            if (leftColor >= 0 && topColor >= 0 && leftColor == topColor)
+            {
+                colorProbabilities[leftColor] = baseProb + probZ;
+                float remainingProb = (1 - colorProbabilities[leftColor]) / (COLORS.Length - 1);
+                for (int i = 0; i < colorProbabilities.Length; i++)
+                {
+                    if (i != leftColor)
+                    {
+                        colorProbabilities[i] = remainingProb;
+                    }
+                }
+            }
+            else
+            {
+                int avgProbCount = COLORS.Length;
+                // a情况
+                if (topColor >= 0)
+                {
+                    colorProbabilities[topColor] = baseProb + probY;
+                    avgProbCount--;
+                }
+
+                // b情况
+                if (leftColor >= 0)
+                {
+                    colorProbabilities[leftColor] = baseProb + probX;
+                    avgProbCount--;
+                }
+
+                // 计算其他颜色的平均概率
+                float sum = 0;
+                foreach (var p in colorProbabilities)
+                {
+                    sum += p;
+                }
+
+                if (sum >= 1f)
+                {
+                    sum = 1f;
+                }
+
+                float avg = (1 - sum) / avgProbCount;
+                for (int i = 0; i < colorProbabilities.Length; i++)
+                {
+                    if (colorProbabilities[i] == 0)
+                    {
+                        colorProbabilities[i] = avg;
+                    }
+                }
+            }
+        }
     }
 }
