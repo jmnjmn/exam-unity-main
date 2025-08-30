@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -15,20 +16,42 @@ using UnityEngine.UI;
 public class Q2 : MonoBehaviour
 {
     [SerializeField]
-    private Button button = null; 
+    private Button button = null;
+
+    private Animator _animator;
+    private static readonly int Show = Animator.StringToHash("Show");
+    private static readonly int TouchDown = Animator.StringToHash("TouchDown");
+    private static readonly int TouchUp = Animator.StringToHash("TouchUp");
+    
+    private void Start()
+    {
+        _animator = button.GetComponent<Animator>();
+    }
 
     public void OnShowBtnClick()
     {
         // TODO: 请在此处开始作答
+        if (_animator!=null)
+        {
+            _animator.Play(Show);
+        }
     }
 
     public void OnTouchDownBtnClick()
     {
         // TODO: 请在此处开始作答
+        if (_animator!=null)
+        {
+            _animator.Play(TouchDown);
+        }
     }
 
     public void OnTouchUpBtnClick()
     {
         // TODO: 请在此处开始作答
+        if (_animator!=null)
+        {
+            _animator.Play(TouchUp);
+        }
     }
 }
