@@ -24,9 +24,100 @@ using Random = UnityEngine.Random;
 
 public class Q3 : MonoBehaviour
 {
+    public class LoadFileTask
+    {
+        public string FileName;
+        public int RetryCount;
+        public string LoadResult;
+    }
+    
+    private const int MaxLoadingTaskCount = 3;
+    private const int TimeoutMilliseconds = 3000;
+    private const int MaxRetryCount = 3;
     public async void OnStartBtnClick()
     {
         // TODO: 请在此处开始作答
+       
+        try
+        { 
+            string[] result =  await LoadConfig();
+            List<Task> tasks = new List<Task>();
+            SemaphoreSlim semaphore = new SemaphoreSlim(MaxLoadingTaskCount);
+
+            Queue<LoadFileTask> failedTasks = new();
+            
+            for (int i = 0; i < result.Length; i++)
+            {
+                await semaphore.WaitAsync();
+                LoadFileTask fileTask = new LoadFileTask()
+                {
+                    FileName = result[i],
+                    RetryCount = 0,
+                    LoadResult = string.Empty,
+                };
+                
+                Task t = StartTask(fileTask, TimeoutMilliseconds).ContinueWith((task) =>
+                {
+                    semaphore.Release();
+                    if (!string.IsNullOrEmpty( task.Result.LoadResult))
+                    {
+                        failedTasks.Enqueue(task.Result);
+                    }
+                });
+                
+                tasks.Add(t);
+                
+            }
+
+            await Task.WhenAll(tasks);
+            
+            await InitSystem();
+            while (failedTasks.Count > 0)
+            {
+                Debug.Log(failedTasks.Dequeue().LoadResult);
+            }
+
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+        }
+    }
+
+    private async Task<LoadFileTask> StartTask(LoadFileTask task,int timeoutMilliseconds)
+    {
+        while (task.RetryCount < MaxRetryCount)
+        {
+            var cts = new CancellationTokenSource();
+            var timeoutTask = Task.Delay(timeoutMilliseconds, cts.Token);
+            var loadFileTask = LoadFile(task.FileName);
+           
+            try
+            {
+                var resultTask = await Task.WhenAny(loadFileTask, timeoutTask);
+                if (resultTask == timeoutTask)
+                {
+                    task.LoadResult = $"Load file failed: {task.FileName}.Load file timeout";
+                    task.RetryCount++;
+                }
+                else
+                {
+                    task.RetryCount = 0;
+                    task.LoadResult= string.Empty;
+                    break;
+                }
+            }
+            catch (Exception e)
+            {
+                task.LoadResult = e.Message;
+                task.RetryCount++;
+            }
+            finally
+            {
+                cts.Dispose();
+            }
+        }
+        return task;
     }
 
     // #region 以下是辅助测试题而写的一些 mock 函数，请勿修改
